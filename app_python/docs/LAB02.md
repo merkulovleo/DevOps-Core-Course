@@ -199,14 +199,14 @@ devops-info-service   latest    e1219da81235   19 seconds ago   225MB
 ### Repository URL
 
 ```
-https://hub.docker.com/r/merkulovleo/devops-info-service
+https://hub.docker.com/r/merkulovlr05/devops-info
 ```
 
 ### Push Commands
 
 ```bash
-docker tag devops-info-service merkulovleo/devops-info-service:latest
-docker push merkulovleo/devops-info-service:latest
+docker tag devops-info-service merkulovlr05/devops-info:latest
+docker push merkulovlr05/devops-info:latest
 ```
 
 ## Bonus: Multi-Stage Build with Compiled Language (Go)

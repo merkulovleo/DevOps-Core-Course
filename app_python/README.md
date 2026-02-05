@@ -85,6 +85,6 @@ docker run -p 8080:8080 -e PORT=8080 -e DEBUG=true devops-info-service
 ### Pulling from Docker Hub
 
 ```bash
-docker pull merkulovleo/devops-info-service:latest
-docker run -p 5000:5000 merkulovleo/devops-info-service:latest
+docker pull merkulovlr05/devops-info:latest
+docker run -p 5000:5000 merkulovlr05/devops-info:latest
 ```
