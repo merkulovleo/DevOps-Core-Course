@@ -77,7 +77,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 | Property | Value |
 |----------|------|
 | Base Image | `python:3.13-slim` |
-| Final Size | ~150 MB |
+| Final Size | 225 MB |
 | Exposed Port | 5000 |
 | User | `appuser` (non-root) |
 | Working Directory | `/app` |
@@ -90,19 +90,29 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 docker build -t devops-info-service .
 ```
 
-Expected output:
+Terminal output:
 ```
-[...] => [builder 1/4] FROM docker.io/library/python:3.13-slim
-[...] => [builder 2/4] WORKDIR /build
-[...] => [builder 3/4] RUN python -m venv /opt/venv
-[...] => [builder 4/4] COPY requirements.txt .
-[...] => [builder 5/5] RUN pip install --no-cache-dir -r requirements.txt
-[...] => [runtime 1/5] FROM docker.io/library/python:3.13-slim
-[...] => [runtime 2/5] RUN groupadd --gid 1000 appgroup ...
-[...] => [runtime 3/5] WORKDIR /app
-[...] => [runtime 4/5] COPY --from=builder /opt/venv /opt/venv
-[...] => [runtime 5/5] COPY app.py .
-[...] => exporting to image
+[+] Building 23.9s (15/15) FINISHED                                            docker:desktop-linux
+ => [internal] load build definition from Dockerfile                                           0.0s
+ => => transferring dockerfile: 1.24kB                                                         0.0s
+ => [internal] load metadata for docker.io/library/python:3.13-slim                            5.2s
+ => [internal] load .dockerignore                                                              0.0s
+ => => transferring context: 543B                                                              0.0s
+ => [builder 1/5] FROM docker.io/library/python:3.13-slim@sha256:49b618b8afc2742b94fa8419d8f  12.4s
+ => [internal] load build context                                                              0.0s
+ => => transferring context: 3.17kB                                                            0.0s
+ => [runtime 2/6] RUN groupadd --gid 1000 appgroup &&     useradd --uid 1000 --gid 1000 --she  0.3s
+ => [builder 2/5] WORKDIR /build                                                               0.2s
+ => [builder 3/5] RUN python -m venv /opt/venv                                                 1.5s
+ => [runtime 3/6] WORKDIR /app                                                                 0.0s
+ => [builder 4/5] COPY requirements.txt .                                                      0.0s
+ => [builder 5/5] RUN pip install --no-cache-dir -r requirements.txt                           3.8s
+ => [runtime 4/6] COPY --from=builder /opt/venv /opt/venv                                      0.1s
+ => [runtime 5/6] COPY app.py .                                                                0.0s
+ => [runtime 6/6] RUN chown -R appuser:appgroup /app                                           0.1s
+ => exporting to image                                                                         0.5s
+ => => exporting layers                                                                        0.4s
+ => => naming to docker.io/library/devops-info-service:latest                                  0.0s
 ```
 
 ### Run the container
@@ -111,11 +121,14 @@ Expected output:
 docker run -p 5000:5000 devops-info-service
 ```
 
-Expected output:
+Terminal output:
 ```
-2025-01-28 12:00:00,000 [INFO] __main__: Starting DevOps Info Service on 0.0.0.0:5000 (debug=False)
+2026-02-05 12:06:14,599 [INFO] __main__: Starting DevOps Info Service on 0.0.0.0:5000 (debug=False)
  * Serving Flask app 'app'
- * Running on http://0.0.0.0:5000
+ * Debug mode: off
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.17.0.2:5000
 ```
 
 ### Verify the application
@@ -124,7 +137,62 @@ Expected output:
 curl http://localhost:5000/
 ```
 
-Expected JSON response with service information.
+Response:
+```json
+{
+  "endpoints": [
+    {"description": "Service info and metadata", "method": "GET", "path": "/"},
+    {"description": "Health check", "method": "GET", "path": "/health"}
+  ],
+  "request": {
+    "client_ip": "192.168.65.1",
+    "method": "GET",
+    "path": "/",
+    "user_agent": "curl/8.7.1"
+  },
+  "runtime": {
+    "current_time": "2026-02-05T12:06:19.962139+00:00",
+    "python_version": "3.13.12",
+    "timezone": "UTC",
+    "uptime_seconds": 5.36
+  },
+  "service": {
+    "description": "A web service providing system and runtime information",
+    "name": "DevOps Info Service",
+    "version": "1.0.0"
+  },
+  "system": {
+    "architecture": "aarch64",
+    "cpu_count": 12,
+    "hostname": "9fa1c9cfdd6a",
+    "platform": "Linux",
+    "platform_version": "#1 SMP Thu Mar 20 16:32:56 UTC 2025"
+  }
+}
+```
+
+### Verify non-root user
+
+```bash
+docker exec <container_id> whoami
+```
+
+Output:
+```
+appuser
+```
+
+### Image size
+
+```bash
+docker images devops-info-service
+```
+
+Output:
+```
+REPOSITORY            TAG       IMAGE ID       CREATED          SIZE
+devops-info-service   latest    e1219da81235   19 seconds ago   225MB
+```
 
 ## Docker Hub
 
@@ -141,15 +209,104 @@ docker tag devops-info-service merkulovleo/devops-info-service:latest
 docker push merkulovleo/devops-info-service:latest
 ```
 
-## Multi-Stage Build Analysis (Bonus)
+## Bonus: Multi-Stage Build with Compiled Language (Go)
+
+To demonstrate the full power of multi-stage builds, a Go version of the service was created in `app_go/`.
+
+### Go Dockerfile Strategy
+
+```dockerfile
+# Stage 1: Builder - compile the Go application
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+COPY go.mod ./
+RUN go mod download
+COPY main.go .
+
+# Build static binary with optimizations
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/server main.go
+
+
+# Stage 2: Runtime - minimal scratch image
+FROM scratch AS runtime
+
+COPY --from=builder /app/server /server
+EXPOSE 8080
+ENTRYPOINT ["/server"]
+```
+
+### Key Optimizations
+
+1. **Static Binary**: `CGO_ENABLED=0` creates a fully static binary with no external dependencies
+2. **Strip Debug Info**: `-ldflags="-s -w"` removes debug symbols, reducing binary size
+3. **Scratch Base**: Using `scratch` (empty image) as the final base - only the binary is included
 
 ### Size Comparison
 
-| Build Type | Estimated Size |
-|------------|----------------|
+| Image | Base | Size |
+|-------|------|------|
+| devops-info-service (Python) | python:3.13-slim | 225 MB |
+| devops-info-service-go | scratch | **6.72 MB** |
+
+**Size reduction: 97%** (33x smaller than Python version)
+
+### Build Output
+
+```
+[+] Building 8.8s (12/12) FINISHED                          docker:desktop-linux
+ => [builder 1/6] FROM docker.io/library/golang:1.22-alpine                 2.6s
+ => [builder 2/6] WORKDIR /build                                            0.2s
+ => [builder 3/6] COPY go.mod ./                                            0.0s
+ => [builder 4/6] RUN go mod download                                       0.1s
+ => [builder 5/6] COPY main.go .                                            0.0s
+ => [builder 6/6] RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w"    2.9s
+ => [runtime 1/1] COPY --from=builder /app/server /server                   0.0s
+ => exporting to image                                                      0.2s
+```
+
+### Verification
+
+```bash
+$ curl http://localhost:8080/
+{
+  "service": {
+    "name": "DevOps Info Service (Go)",
+    "version": "1.0.0",
+    "description": "A web service providing system and runtime information"
+  },
+  "system": {
+    "hostname": "9107f38b59ef",
+    "platform": "linux",
+    "architecture": "arm64",
+    "num_cpu": 12,
+    "go_version": "go1.22.12"
+  },
+  "runtime": {
+    "uptime_seconds": 4.37,
+    "current_time": "2026-02-05T12:23:32Z",
+    "timezone": "UTC"
+  }
+}
+```
+
+### Security Benefits of Smaller Images
+
+1. **Minimal Attack Surface**: The scratch image contains nothing but the binary - no shell, no utilities, no package manager
+2. **No CVEs from Base OS**: Since there's no OS layer, there are no OS-level vulnerabilities
+3. **Cannot Shell Into Container**: Attackers cannot get a shell even if they exploit the application
+4. **Faster Scanning**: Vulnerability scanners complete almost instantly
+5. **Immutable Runtime**: The container cannot be modified at runtime
+
+## Multi-Stage Build Analysis (Python)
+
+### Size Comparison
+
+| Build Type | Size |
+|------------|------|
 | Single-stage (python:3.13) | ~1 GB |
 | Single-stage (python:3.13-slim) | ~180 MB |
-| Multi-stage (python:3.13-slim) | ~150 MB |
+| Multi-stage (python:3.13-slim) | 225 MB |
 
 ### Security Benefits
 
