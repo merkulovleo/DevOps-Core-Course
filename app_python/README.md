@@ -61,3 +61,30 @@ Example:
 ```bash
 HOST=127.0.0.1 PORT=8080 DEBUG=true python app.py
 ```
+
+## Docker
+
+### Building the Image
+
+```bash
+docker build -t devops-info-service .
+```
+
+### Running the Container
+
+```bash
+docker run -p 5000:5000 devops-info-service
+```
+
+With environment variables:
+
+```bash
+docker run -p 8080:8080 -e PORT=8080 -e DEBUG=true devops-info-service
+```
+
+### Pulling from Docker Hub
+
+```bash
+docker pull merkulovleo/devops-info-service:latest
+docker run -p 5000:5000 merkulovleo/devops-info-service:latest
+```
