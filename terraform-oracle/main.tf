@@ -117,13 +117,13 @@ resource "oci_core_security_list" "lab04_sl" {
 
 # Create Subnet
 resource "oci_core_subnet" "lab04_subnet" {
-  compartment_id      = var.compartment_ocid
-  vcn_id              = oci_core_vcn.lab04_vcn.id
-  cidr_block          = "10.0.1.0/24"
-  display_name        = "lab04-subnet"
-  dns_label           = "lab04subnet"
-  route_table_id      = oci_core_route_table.lab04_rt.id
-  security_list_ids   = [oci_core_security_list.lab04_sl.id]
+  compartment_id             = var.compartment_ocid
+  vcn_id                     = oci_core_vcn.lab04_vcn.id
+  cidr_block                 = "10.0.1.0/24"
+  display_name               = "lab04-subnet"
+  dns_label                  = "lab04subnet"
+  route_table_id             = oci_core_route_table.lab04_rt.id
+  security_list_ids          = [oci_core_security_list.lab04_sl.id]
   prohibit_public_ip_on_vnic = false
 }
 
@@ -142,8 +142,8 @@ resource "oci_core_instance" "lab04_vm" {
 
   # Create boot volume
   source_details {
-    source_id   = data.oci_core_images.oracle_linux.images[0].id
-    source_type = "image"
+    source_id               = data.oci_core_images.oracle_linux.images[0].id
+    source_type             = "image"
     boot_volume_size_in_gbs = 50 # Free tier allows up to 200GB total
   }
 
